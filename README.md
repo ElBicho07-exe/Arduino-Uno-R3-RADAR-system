@@ -30,7 +30,7 @@ The result is a visually rich, defense-style RADAR interface suitable for learni
 
 ---
 
-##  Wiring Connections
+##  Wiring Connections (**See the PNG file for better understanding**)
 
 ### Ultrasonic Sensor (HC‑SR04)
 
@@ -159,3 +159,4 @@ Open-source. Free to use, modify, and extend for educational purposes.
 ---
 
 **Author:** Shaurya Attreya AKA Ronny
+
