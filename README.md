@@ -30,7 +30,7 @@ The result is a visually rich, defense-style RADAR interface suitable for learni
 
 ---
 
-##  Wiring Connections (**See the PNG file for better understanding : https://github.com/ElBicho07-exe/Arduino-Uno-R3-RADAR-system/blob/main/connections_radarsystem.png?raw=true**)
+##  Wiring Connections (**See the PNG file for better understanding : https://github.com/ElBicho07-exe/Arduino-Uno-R3-RADAR-system/blob/main/connections_radarsystem.png?raw=true OPEN IN NEW-TAB**)
 
 ### Ultrasonic Sensor (HC‑SR04)
 
@@ -159,5 +159,6 @@ Open-source. Free to use, modify, and extend for educational purposes.
 ---
 
 **Author:** Shaurya Attreya AKA Ronny
+
 
 
