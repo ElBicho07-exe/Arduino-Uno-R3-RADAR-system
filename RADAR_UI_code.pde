@@ -1,13 +1,52 @@
 import processing.serial.*;
+import java.util.ArrayList;
 
 Serial myPort;
 String data = "";
 
-int angle = 0;
+int sensorAngle = 0;
+int visualAngle = 0;
+
 int distance = 0;
+int lastDistance = 0;
 
-float pulse = 0;
+boolean isRunning = true;
+float pulsePhase = 0;
 
+// ==========================
+// RADAR PULSE CLASS
+// ==========================
+class RadarPulse {
+  float r;
+  float alpha;
+
+  RadarPulse() {
+    r = 0;
+    alpha = 180;
+  }
+
+  void update() {
+    r += 4;
+    alpha -= 2;
+  }
+
+  boolean dead() {
+    return alpha <= 0 || r > 420;
+  }
+
+  void draw() {
+    stroke(0, 255, 0, alpha);
+    noFill();
+    strokeWeight(2);
+    arc(0, 0, r*2, r*2, PI, TWO_PI);
+  }
+}
+
+ArrayList<RadarPulse> pulses = new ArrayList<RadarPulse>();
+
+// ==========================
+// SETUP
+// ==========================
 void setup() {
   size(900, 650);
   smooth(8);
@@ -16,19 +55,34 @@ void setup() {
   myPort.bufferUntil('.');
 }
 
+// ==========================
+// MAIN DRAW LOOP
+// ==========================
 void draw() {
   background(0, 40);
 
   translate(width/2, height - 50);
 
   drawRadarGrid();
+  drawPulses();
   drawSweep();
   drawTarget();
   drawHUD();
+  drawButton();
 
-  pulse += 0.08;
+  if (isRunning) {
+    visualAngle = sensorAngle;   // 🔑 sync ONLY when running
+    pulsePhase += 0.08;
+
+    if (frameCount % 15 == 0) {
+      pulses.add(new RadarPulse());
+    }
+  }
 }
 
+// ==========================
+// SERIAL EVENT
+// ==========================
 void serialEvent(Serial myPort) {
   data = myPort.readStringUntil('.');
   if (data != null) {
@@ -37,15 +91,23 @@ void serialEvent(Serial myPort) {
 
     String[] values = split(data, ',');
     if (values.length == 2) {
-      angle = int(values[0]);
+      sensorAngle = int(values[0]);
       distance = int(values[1]);
+
+      if (isRunning) {
+        lastDistance = distance;
+      }
     }
   }
 }
 
+// ==========================
+// RADAR GRID
+// ==========================
 void drawRadarGrid() {
   stroke(0, 255, 80, 120);
   noFill();
+  strokeWeight(1);
 
   for (int r = 100; r <= 400; r += 100) {
     arc(0, 0, r*2, r*2, PI, TWO_PI);
@@ -57,43 +119,105 @@ void drawRadarGrid() {
   }
 }
 
-void drawSweep() {
-  float rad = radians(angle);
+// ==========================
+// RADAR PULSES
+// ==========================
+void drawPulses() {
+  if (!isRunning) return;
 
-  for (int i = 0; i < 6; i++) {
-    stroke(0, 255, 0, 60 - i*10);
-    strokeWeight(2);
-    line(0, 0,
-         420*cos(rad - radians(i)),
-        -420*sin(rad - radians(i)));
+  for (int i = pulses.size() - 1; i >= 0; i--) {
+    RadarPulse p = pulses.get(i);
+    p.update();
+    p.draw();
+    if (p.dead()) pulses.remove(i);
   }
 }
 
+// ==========================
+// SWEEP BEAM
+// ==========================
+void drawSweep() {
+  float rad = radians(visualAngle);
+
+  for (int i = 0; i < 12; i++) {
+    stroke(0, 255, 0, 120 - i*8);
+    strokeWeight(2);
+    line(0, 0,
+         (420 - i*10)*cos(rad),
+        -(420 - i*10)*sin(rad));
+  }
+}
+
+// ==========================
+// TARGET BLIP
+// ==========================
 void drawTarget() {
-  if (distance < 200) {
-    float rad = radians(angle);
-    float d = map(distance, 0, 200, 0, 400);
+  if (lastDistance > 0 && lastDistance < 200) {
+    float rad = radians(visualAngle);
+    float d = map(lastDistance, 0, 200, 0, 400);
 
     float px = d * cos(rad);
     float py = -d * sin(rad);
 
     stroke(0, 255, 0);
-    fill(0, 255, 0, 150 + 100*sin(pulse));
-    ellipse(px, py, 10, 10);
+    fill(0, 255, 0, 180);
+    ellipse(px, py, 12, 12);
 
     fill(0, 255, 0);
     textSize(14);
-    text(distance + " cm", px + 10, py - 10);
+    text(lastDistance + " cm", px + 12, py - 8);
   }
 }
 
+// ==========================
+// HUD
+// ==========================
 void drawHUD() {
   resetMatrix();
   fill(0, 255, 0);
   textSize(16);
 
   text("RADAR SCAN SYSTEM", 20, 30);
-  text("ANGLE : " + angle + "°", 20, 55);
-  text("DIST  : " + distance + " cm", 20, 80);
-  text("RANGE : 200 cm", 20, 105);
+  text("ANGLE : " + visualAngle + "°", 20, 55);
+  text("DIST  : " + lastDistance + " cm", 20, 80);
+  text("STATUS: " + (isRunning ? "RUNNING" : "PAUSED"), 20, 105);
 }
+
+// ==========================
+// BUTTON
+// ==========================
+void drawButton() {
+  int bx = width - 160;
+  int by = 30;
+  int bw = 120;
+  int bh = 40;
+
+  resetMatrix();
+
+  stroke(0, 255, 0);
+  fill(isRunning ? color(0, 120, 0) : color(120, 0, 0));
+  rect(bx, by, bw, bh, 6);
+
+  fill(0, 255, 0);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+  text(isRunning ? "PAUSE" : "RESUME", bx + bw/2, by + bh/2);
+  textAlign(LEFT, BASELINE);
+}
+
+// ==========================
+// MOUSE CLICK
+// ==========================
+void mousePressed() {
+  int bx = width - 160;
+  int by = 30;
+  int bw = 120;
+  int bh = 40;
+
+  if (mouseX > bx && mouseX < bx + bw &&
+      mouseY > by && mouseY < by + bh) {
+
+    isRunning = !isRunning;
+  }
+}
+
